@@ -81,6 +81,9 @@ pub struct CmdLineOpts {
     /// Generate a `no_std` library, limiting usage to `core` and `alloc`
     #[clap(long)]
     no_std_library: bool,
+    /// Generate a `no_std` library, limiting usage to `core` and `alloc`
+    #[clap(long)]
+    use_x86_segments: bool,
 }
 
 fn main() -> Maybe<()> {
