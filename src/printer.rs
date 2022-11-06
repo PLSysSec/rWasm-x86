@@ -2185,9 +2185,11 @@ pub fn print_module(m: &wasm::syntax::Module, opts: &CmdLineOpts) -> Maybe<()> {
                 );
                 dbgprintln!(0, "Generated main WASI library init function");
             } else {
+                let write_gs_base = include_str!("../templates-for-generation/wrgsbase.rs");
                 generated += &format!(
                     "fn main() {{
                          let mut wasm_module = WasmModule::new();
+                         {write_gs_base}
                          wasm_module.{start_func_name}().unwrap();
                      }}",
                     start_func_name = start_func_name,
