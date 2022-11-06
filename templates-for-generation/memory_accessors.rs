@@ -1,7 +1,22 @@
+#[inline]
+#[allow(dead_code)]
+fn readgsbase() -> *const u8 {
+    unsafe {
+        let x;
+        std::arch::asm!(
+            "rdgsbase {x}",
+            x = out(reg) x,
+            options(pure, nomem),
+        );
+        x
+    }
+}
+
+
 macro_rules! memory_accessors {
     ($ty:ty, $read:ident, $write:ident) => {
         #[inline]
-        #[allow(dead_code)]
+        #[allow(dead_code, unused_variables)]
         fn $read(memory: &[u8], addr: usize) -> Option<$ty> {
             Some(<$ty>::from_le_bytes(
                 <<MEMORYGET>>
@@ -11,7 +26,7 @@ macro_rules! memory_accessors {
         }
 
         #[inline]
-        #[allow(dead_code)]
+        #[allow(dead_code, unused_variables)]
         fn $write(memory: &mut [u8], addr: usize, value: $ty) -> Option<()> {
             <<MEMORYGETMUT>>
                 .copy_from_slice(&value.to_le_bytes());

@@ -2003,11 +2003,11 @@ fn print_generated_code_prefix(m: &wasm::syntax::Module, opts: &CmdLineOpts) -> 
             template
                 .replace(
                     "<<MEMORYGET>>",
-                    &format!("unsafe {{ std::slice::from_raw_parts(x86::segmentation::gs + addr,  std::mem::size_of::<$ty>())}}"),
+                    &format!("unsafe {{ std::slice::from_raw_parts(readgsbase().add(addr),  std::mem::size_of::<$ty>())}}"),
                 )
                 .replace(
                     "<<MEMORYGETMUT>>",
-                    &format!("unsafe {{ std::slice::from_raw_parts_mut(x86::segmentation::gs + addr,  std::mem::size_of::<$ty>())}}"),
+                    &format!("unsafe {{ std::slice::from_raw_parts_mut(readgsbase().add(addr) as *mut u8,  std::mem::size_of::<$ty>())}}"),
                 )
         } else if opts.unsafe_linear_memory {
             template
