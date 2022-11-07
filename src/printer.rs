@@ -546,18 +546,36 @@ fn print_instr(
             } else {
                 "self.memory"
             };
-            let mem_reader = match &mem.extend {
-                None => format!("read_mem_{}(&{}, {} as usize)", mem.typ, self_mem, ea),
-                Some((n, sx)) => {
-                    if mem.typ == wasm::syntax::ValType::I32
-                        || mem.typ == wasm::syntax::ValType::I64
-                    {
-                        format!(
-                            "read_mem_{}{}(&{}, {} as usize).and_then(|x| Some(x as {}))",
-                            sx, n, self_mem, ea, mem.typ
-                        )
-                    } else {
-                        Err(eyre!("Invalid memory load"))?
+            let mem_reader = if opts.use_x86_segments {
+                match &mem.extend {
+                    None => format!("x86_read_mem_{}({} as usize)", mem.typ, ea),
+                    Some((n, sx)) => {
+                        if mem.typ == wasm::syntax::ValType::I32
+                            || mem.typ == wasm::syntax::ValType::I64
+                        {
+                            format!(
+                                "x86_read_mem_{}{}({} as usize).and_then(|x| Some(x as {}))",
+                                sx, n, ea, mem.typ
+                            )
+                        } else {
+                            Err(eyre!("Invalid x86 memory load"))?
+                        }
+                    }
+                }
+            } else {
+                match &mem.extend {
+                    None => format!("read_mem_{}(&{}, {} as usize)", mem.typ, self_mem, ea),
+                    Some((n, sx)) => {
+                        if mem.typ == wasm::syntax::ValType::I32
+                            || mem.typ == wasm::syntax::ValType::I64
+                        {
+                            format!(
+                                "read_mem_{}{}(&{}, {} as usize).and_then(|x| Some(x as {}))",
+                                sx, n, self_mem, ea, mem.typ
+                            )
+                        } else {
+                            Err(eyre!("Invalid memory load"))?
+                        }
                     }
                 }
             };
@@ -620,25 +638,47 @@ fn print_instr(
             } else {
                 "self.memory"
             };
-            match &mem.bitwidth {
-                None => Ok(format!(
-                    "{}write_mem_{}(&mut {}, {} as usize, {})?;",
-                    mem_trace, mem.typ, self_mem, ea, src
-                )),
-                Some(n) => {
-                    if mem.typ == wasm::syntax::ValType::I32
-                        || mem.typ == wasm::syntax::ValType::I64
-                    {
-                        Ok(format!(
-                            "{}write_mem_u{}(&mut {}, {} as usize, {} as u{})?;",
-                            mem_trace, n, self_mem, ea, src, n
-                        ))
-                    } else {
-                        Err(eyre!("Invalid memory store"))?
+            if opts.use_x86_segments {
+                match &mem.bitwidth {
+                    None => Ok(format!(
+                        "x86_{}write_mem_{}({} as usize, {})?;",
+                        mem_trace, mem.typ, ea, src
+                    )),
+                    Some(n) => {
+                        if mem.typ == wasm::syntax::ValType::I32
+                            || mem.typ == wasm::syntax::ValType::I64
+                        {
+                            Ok(format!(
+                                "{}x86_write_mem_u{}({} as usize, {} as u{})?;",
+                                mem_trace, n, ea, src, n
+                            ))
+                        } else {
+                            Err(eyre!("Invalid memory store"))?
+                        }
+                    }
+                }
+            } else {
+                match &mem.bitwidth {
+                    None => Ok(format!(
+                        "{}write_mem_{}(&mut {}, {} as usize, {})?;",
+                        mem_trace, mem.typ, self_mem, ea, src
+                    )),
+                    Some(n) => {
+                        if mem.typ == wasm::syntax::ValType::I32
+                            || mem.typ == wasm::syntax::ValType::I64
+                        {
+                            Ok(format!(
+                                "{}write_mem_u{}(&mut {}, {} as usize, {} as u{})?;",
+                                mem_trace, n, self_mem, ea, src, n
+                            ))
+                        } else {
+                            Err(eyre!("Invalid memory store"))?
+                        }
                     }
                 }
             }
         }
+
         MemSize => {
             // Note: The spec defines Page Size = 65536
             let inner_mem_size = if opts.fixed_mem_size.is_some() {
@@ -2003,11 +2043,17 @@ fn print_generated_code_prefix(m: &wasm::syntax::Module, opts: &CmdLineOpts) -> 
             template
                 .replace(
                     "<<MEMORYGET>>",
-                    &format!("unsafe {{ std::slice::from_raw_parts(readgsbase().add(addr),  std::mem::size_of::<$ty>())}}"),
+                    &format!(
+                        "{{ assert!(false); unsafe {{ memory.get_unchecked({}) }} }}",
+                        range
+                    ), // disable regular loads/stores
                 )
                 .replace(
                     "<<MEMORYGETMUT>>",
-                    &format!("unsafe {{ std::slice::from_raw_parts_mut(readgsbase().add(addr) as *mut u8,  std::mem::size_of::<$ty>())}}"),
+                    &format!(
+                        "{{ assert!(false); unsafe {{ memory.get_unchecked_mut({}) }} }}",
+                        range
+                    ), // disable regular loads/stores
                 )
         } else if opts.unsafe_linear_memory {
             template
